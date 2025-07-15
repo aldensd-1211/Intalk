@@ -18,18 +18,41 @@ function Provider({ children }) {
 
       console.log(Users);
       if (Users?.length == 0) {
-        await supabase.from("Users").insert([
-          {
-            name: user?.user_metadata?.name,
-            email: user?.email,
-            picture: user?.user_metadata?.picture,
-          },
-        ]);
-        console.log(data);
-        setUser(data);
+        // await supabase.from("Users").insert([
+        //   {
+        //     name: user?.user_metadata?.name,
+        //     email: user?.email,
+        //     picture: user?.user_metadata?.picture,
+        //   },
+        // ]);
+        // console.log(data);
+        // setUser({
+        //   name: user?.user_metadata?.name,
+        //   email: user?.email,
+        //   picture: user?.user_metadata?.picture,
+        // });
+
+        const { data: newUserData, error: insertError } = await supabase
+          .from("Users")
+          .insert([
+            {
+              name: user?.user_metadata?.name,
+              email: user?.email,
+              picture: user?.user_metadata?.picture,
+            },
+          ])
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("Insert error:", insertError);
+        } else {
+          setUser(newUserData);
+        }
+
         return;
       }
-      setUser(Users);
+      setUser(Users[0]);
     });
   };
   return (
