@@ -1,6 +1,5 @@
 import { QUESTION_PROMPT } from "@/services/Constants";
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 
 export async function POST(req) {
   const { jobPosition, jobDescription, duration, type } = await req.json();
@@ -8,30 +7,41 @@ export async function POST(req) {
     .replace("{{jobDescription}}", jobDescription)
     .replace("{{duration}}", duration)
     .replace("{{type}}", type);
-  console.log(FINAL_PROMPT);
 
   try {
-    const openai = new OpenAI({
-      baseURL: "https://openrouter.ai/api/v1",
-      apiKey: process.env.OPENROUTER_API_KEY,
-    });
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    const GEMINI_URL =
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
-    const completion = await openai.chat.completions.create({
-      model: "google/gemini-2.0-flash-exp:free",
-      messages: [
+    const payload = {
+      contents: [
         {
-          role: "user",
-          content: FINAL_PROMPT,
+          parts: [
+            {
+              text: FINAL_PROMPT,
+            },
+          ],
         },
       ],
+    };
+
+    const response = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
 
-    console.log(completion.choices[0].message);
-    return NextResponse.json({
-      content: completion.choices[0].message.content,
-    });
-  } catch (e) {
-    console.log(e);
-    return NextResponse.json(e);
+    const data = await response.json();
+    const generated = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    return NextResponse.json({ content: generated });
+  } catch (error) {
+    console.error("Error from Gemini:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch from Gemini API" },
+      { status: 500 }
+    );
   }
 }

@@ -8,7 +8,7 @@ import { supabase } from "@/services/supabaseClient";
 import { useUser } from "@/app/provider";
 import { v4 as uuidv4 } from "uuid";
 
-function QuestionList({ formData }) {
+function QuestionList({ formData, onCreateLink }) {
   const [loading, setLoading] = useState(true);
   const [questionList, setQuestionList] = useState([]);
   const { user } = useUser();
@@ -27,15 +27,21 @@ function QuestionList({ formData }) {
         ...formData,
       });
 
-      const Content = result.data.content;
-      const FINAL_JSON = Content.replace(/```(?:json)?/g, "").trim();
+      const content = result.data.content;
+      const regexMatch = content.match(/```json([\s\S]*?)```/);
 
-      try {
-        const parsed = JSON.parse(FINAL_JSON);
+      if (regexMatch && regexMatch[1]) {
+        const parsed = JSON.parse(regexMatch[1].trim());
         setQuestionList(parsed?.interviewQuestions);
-      } catch (e) {
-        console.error("Failed to parse JSON:", FINAL_JSON);
-        toast("Invalid response format from AI");
+      } else {
+        const fallbackMatch = content.match(/{[\s\S]*}/);
+        if (fallbackMatch) {
+          const parsed = JSON.parse(fallbackMatch[0]);
+          setQuestionList(parsed?.interviewQuestions);
+        } else {
+          console.error("No valid JSON found in response");
+          toast("AI response did not include valid JSON.");
+        }
       }
 
       setLoading(false);
@@ -44,6 +50,13 @@ function QuestionList({ formData }) {
         "Error generating questions:",
         e.response?.data || e.message
       );
+      if (e.code === 429) {
+        return NextResponse.json(
+          { error: "Rate limit hit, please wait." },
+          { status: 429 }
+        );
+      }
+
       toast("Server Error, Try Again");
       setLoading(false);
     }
@@ -64,6 +77,7 @@ function QuestionList({ formData }) {
       ])
       .select();
     setSaveLoading(false);
+    onCreateLink(interview_id);
   };
 
   return (
@@ -88,7 +102,7 @@ function QuestionList({ formData }) {
       <div className="flex justify-end mt-10">
         <Button onClick={() => onFinish()} disabled={saveLoading}>
           {saveLoading && <Loader2Icon className="animate-spin" />}
-          Finish
+          Create Interview Link & Finish
         </Button>
       </div>
     </div>
