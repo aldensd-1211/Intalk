@@ -239,6 +239,7 @@ function StartInterview() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [callEnded, setCallEnded] = useState(false);
+  const hasGeneratedRef = useRef(false);
 
   useEffect(() => {
     if (!vapiRef.current) {
@@ -377,22 +378,43 @@ Key Guidelines:
   }, []);
 
   const GenerateFeedback = async () => {
+    if (hasGeneratedRef.current) {
+      console.log("Feedback already generated. Skipping.");
+      return;
+    }
+
+    hasGeneratedRef.current = true;
+
     try {
-      if (!conversation) {
-        toast.warning("No conversation recorded.");
-        return router.replace(`/interview/${interview_id}/completed`);
+      let convoObj = [];
+      if (conversation) {
+        convoObj = JSON.parse(conversation);
       }
 
-      const convoObj = JSON.parse(conversation);
       const userMessages = convoObj.filter((msg) => msg.role === "user");
 
-      if (userMessages.length === 0) {
-        toast.warning("Candidate did not speak.");
-        return router.replace(`/interview/${interview_id}/completed`);
+      let finalConversation = conversation;
+
+      if (!conversation || userMessages.length === 0) {
+        toast.warning("Candidate did not speak. Sending fallback.");
+        finalConversation = JSON.stringify([
+          {
+            role: "assistant",
+            content: "Hi! Let's begin your interview.",
+          },
+          {
+            role: "assistant",
+            content: "It seems like you didn’t respond. No worries!",
+          },
+          {
+            role: "assistant",
+            content: "Let’s try again next time. Good luck!",
+          },
+        ]);
       }
 
       const result = await axios.post("/api/ai-feedback", {
-        conversation,
+        conversation: finalConversation,
       });
 
       const Content = result?.data?.content || "";

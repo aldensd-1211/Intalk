@@ -1,10 +1,10 @@
 import { Button } from "@/components/ui/button";
-import { Copy, Send } from "lucide-react";
+import { ArrowRight, Copy, Send } from "lucide-react";
 import moment from "moment";
 import React from "react";
 import { toast } from "sonner";
 
-function InterviewCard({ interview }) {
+function InterviewCard({ interview, viewDetail = false }) {
   const url = process.env.NEXT_PUBLIC_HOST_URL + "/" + interview?.interview_id;
 
   const copyLink = () => {
@@ -27,15 +27,30 @@ function InterviewCard({ interview }) {
         </h2>
       </div>
       <h2 className="mt-2 font-bold text-md">{interview?.jobPosition}</h2>
-      <h2 className="mt-2">{interview?.duration} Min</h2>
-      <div className="flex gap-3 w-full mt-5">
-        <Button variant="outline" className={"w-[50%]"} onClick={copyLink}>
-          <Copy /> Copy Link
+      <h2 className="mt-2 flex justify-between text-gray-500">
+        {interview?.duration} Min
+        <span className="font-semibold">
+          {interview["interview-feedback"]?.length}{" "}
+          {interview["interview-feedback"]?.length === 1
+            ? "Candidate"
+            : "Candidates"}
+        </span>
+      </h2>
+      {!viewDetail ? (
+        <div className="flex gap-3 w-full mt-5">
+          <Button variant="outline" className={"w-[50%]"} onClick={copyLink}>
+            <Copy /> Copy Link
+          </Button>
+          <Button className={"w-[50%]"} onClick={onSend}>
+            <Send /> Send
+          </Button>
+        </div>
+      ) : (
+        <Button className="mt-5 w-full " variant="outline">
+          View Details
+          <ArrowRight />
         </Button>
-        <Button className={"w-[50%]"} onClick={onSend}>
-          <Send /> Send
-        </Button>
-      </div>
+      )}
     </div>
   );
 }
