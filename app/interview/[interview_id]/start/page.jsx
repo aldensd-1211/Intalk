@@ -228,10 +228,11 @@ import TimerComponent from "./_components/TimerComponent";
 import axios from "axios";
 import { supabase } from "@/services/supabaseClient";
 import { useParams, useRouter } from "next/navigation";
+import { useRef } from "react";
 
 function StartInterview() {
   const { interviewInfo, setInterviewInfo } = useContext(InterviewDataContext);
-  const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY);
+  const vapiRef = useRef(null);
   const [activeUser, setActiveUser] = useState(false);
   const [conversation, setConversation] = useState();
   const { interview_id } = useParams();
@@ -240,10 +241,20 @@ function StartInterview() {
   const [callEnded, setCallEnded] = useState(false);
 
   useEffect(() => {
-    interviewInfo && startCall();
+    if (!vapiRef.current) {
+      vapiRef.current = new Vapi(process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (interviewInfo && vapiRef.current) {
+      startCall();
+    }
   }, [interviewInfo]);
 
   const startCall = () => {
+    const vapi = vapiRef.current;
+    if (!vapi) return;
     const questionList = interviewInfo?.interviewData?.questionList
       ?.map((item) => item?.question)
       .join(", ");
@@ -309,25 +320,29 @@ Key Guidelines:
   };
 
   const stopInterview = () => {
-    console.log("Stop Interview Called");
-    if (callEnded) {
-      console.warn("Call already ended. Skipping stopInterview.");
-      return;
-    }
-    if (vapi) {
-      vapi.stop();
-    } else {
-      console.error("Vapi instance not available");
-    }
+    const vapi = vapiRef.current;
+    if (!vapi || callEnded) return;
+
+    setLoading(true);
+    vapi.stop();
+
+    setTimeout(() => {
+      if (!callEnded) {
+        toast.warning("Call did not end properly. Forcing end.");
+        setCallEnded(true);
+        GenerateFeedback();
+      }
+    }, 8000); // fallback if call-end doesn't fire
   };
 
   useEffect(() => {
+    const vapi = vapiRef.current;
+    if (!vapi) return;
+
     const handleMessage = (message) => {
       console.log("Message: ", message);
-      if (message?.conversation) {
-        const convoString = JSON.stringify(message.conversation);
-        console.log("Conversation string:", convoString);
-        setConversation(convoString);
+      if (Array.isArray(message?.conversation)) {
+        setConversation(JSON.stringify(message.conversation));
       }
     };
     vapi.on("message", handleMessage);
@@ -347,7 +362,9 @@ Key Guidelines:
       console.log("Call has ended");
       setCallEnded(true);
       toast("Interview Ended!");
-      GenerateFeedback();
+      setTimeout(() => {
+        GenerateFeedback();
+      }, 1000);
     });
 
     return () => {
@@ -361,56 +378,49 @@ Key Guidelines:
 
   const GenerateFeedback = async () => {
     try {
+      if (!conversation) {
+        toast.warning("No conversation recorded.");
+        return router.replace(`/interview/${interview_id}/completed`);
+      }
+
+      const convoObj = JSON.parse(conversation);
+      const userMessages = convoObj.filter((msg) => msg.role === "user");
+
+      if (userMessages.length === 0) {
+        toast.warning("Candidate did not speak.");
+        return router.replace(`/interview/${interview_id}/completed`);
+      }
+
       const result = await axios.post("/api/ai-feedback", {
-        conversation: conversation,
+        conversation,
       });
 
       const Content = result?.data?.content || "";
-
       if (!Content) {
-        console.error("Empty feedback content received.");
-        toast.error("AI did not return any feedback.");
-        return;
+        toast.warning("No feedback generated.");
+        return router.replace(`/interview/${interview_id}/completed`);
       }
 
       const FINAL_CONTENT = Content.replace("```json", "")
         .replace("```", "")
         .trim();
+      const parsed = JSON.parse(FINAL_CONTENT);
 
-      let parsed;
-      try {
-        parsed = JSON.parse(FINAL_CONTENT);
-      } catch (e) {
-        console.error("JSON parse failed:", e);
-        console.error("Raw content:", FINAL_CONTENT);
-        toast.error("Failed to generate feedback. Invalid format.");
-        return;
-      }
+      await supabase.from("interview-feedback").insert([
+        {
+          userName: interviewInfo?.userName,
+          userEmail: interviewInfo?.userEmail,
+          interview_id: interview_id,
+          feedback: parsed,
+          recommended: false,
+        },
+      ]);
 
-      const { data, error } = await supabase
-        .from("interview-feedback")
-        .insert([
-          {
-            userName: interviewInfo?.userName,
-            userEmail: interviewInfo?.userEmail,
-            interview_id: interview_id,
-            feedback: parsed,
-            recommended: false,
-          },
-        ])
-        .select();
-
-      if (error) {
-        console.error("Supabase insert error:", error);
-        toast.error("Failed to save feedback.");
-        return;
-      }
-
-      console.log("Feedback saved:", data);
       router.replace(`/interview/${interview_id}/completed`);
     } catch (err) {
       console.error("Feedback generation failed:", err);
-      toast.error("An error occurred during feedback generation.");
+      toast.error("Something went wrong.");
+      router.replace(`/interview/${interview_id}/completed`);
     }
   };
 
