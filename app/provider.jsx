@@ -1,6 +1,7 @@
 "use client";
 import { UserDetailContext } from "@/context/UserDetailContext";
 import { supabase } from "@/services/supabaseClient";
+import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 import React, { useContext, useEffect, useState } from "react";
 
 function Provider({ children }) {
@@ -18,20 +19,6 @@ function Provider({ children }) {
 
       console.log(Users);
       if (Users?.length == 0) {
-        // await supabase.from("Users").insert([
-        //   {
-        //     name: user?.user_metadata?.name,
-        //     email: user?.email,
-        //     picture: user?.user_metadata?.picture,
-        //   },
-        // ]);
-        // console.log(data);
-        // setUser({
-        //   name: user?.user_metadata?.name,
-        //   email: user?.email,
-        //   picture: user?.user_metadata?.picture,
-        // });
-
         const { data: newUserData, error: insertError } = await supabase
           .from("Users")
           .insert([
@@ -57,9 +44,13 @@ function Provider({ children }) {
   };
   return (
     <div>
-      <UserDetailContext.Provider value={{ user, setUser }}>
-        {children}
-      </UserDetailContext.Provider>
+      <PayPalScriptProvider
+        options={{ clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID }}
+      >
+        <UserDetailContext.Provider value={{ user, setUser }}>
+          {children}
+        </UserDetailContext.Provider>
+      </PayPalScriptProvider>
     </div>
   );
 }
