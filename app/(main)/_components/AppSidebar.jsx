@@ -24,17 +24,21 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="flex items-center mt-5">
-        <Image
-          src={"/logo.png"}
-          alt="logo"
-          width={200}
-          height={100}
-          className="w-[120px]"
-        />
-        <Button className="w-full mt-5">
-          <Plus />
-          Create New Interview
-        </Button>
+        <Link href="/" className="text-2xl font-bold text-teal-600">
+          <Image
+            src={"/logo.png"}
+            alt="logo"
+            width={200}
+            height={100}
+            className="w-[120px]"
+          />
+        </Link>
+        <Link href="/dashboard/create-interview">
+          <Button className="w-full mt-5">
+            <Plus />
+            Create New Interview
+          </Button>
+        </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
