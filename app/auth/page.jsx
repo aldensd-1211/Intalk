@@ -9,7 +9,7 @@ const page = () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: "http://localhost:3000", // ✅ or your production domain
+        redirectTo: "https://intalkweb.vercel.app/",
       },
     });
     if (error) {
